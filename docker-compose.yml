@@ -1,0 +1,37 @@
+version: "3.7"
+services:
+  api_service:
+    build: .
+    restart: always
+    ports:
+      - 9091:9091
+    links:
+      - mongo_db:app_db
+  mongo_db:
+    image: mongo:4.4.5
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://host.docker.internal:27017
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:29092,LISTENER_DOCKER_EXTERNAL://kafka:9092
+      KAFKA_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:29092,LISTENER_DOCKER_EXTERNAL://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_EXTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_MESSAGE_MAX_BYTES: 2000000
+      KAFKA_CREATE_TOPICS: "topic-state-machine-creation:1:1,topic-state-machine-search:1:1,topic-update-employee:1:1,topic-state-machine-status:1:1"
+

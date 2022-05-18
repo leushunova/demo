@@ -43,27 +43,27 @@ public class KafkaConsumer {
     @Autowired
     private KafkaTemplate kafkaTemplate;
 
-    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_1,
+    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_STATE_MACHINE_CREATION,
             containerFactory = ApplicationConstant.KAFKA_LISTENER_CONTAINER_FACTORY)
     public void receivedMessageFromTopic1(ConsumerRecord message) {
-        ResponseEntity<MongoDbRepositoryStateMachine> status = stateMachineService.create(message.value().toString());
-        String statusCode = String.valueOf(status.getStatusCode().value());
-        String id = status.getBody().getId();
-        logger.info("State machine was created " + statusCode);
-        kafkaTemplate.send(ApplicationConstant.TOPIC_5, id, statusCode);
+        MongoDbRepositoryStateMachine stateMachine = stateMachineService.create(message.value().toString());
+        String state = String.valueOf(stateMachine.getState());
+        String id = stateMachine.getId();
+        logger.info("State machine was created " + state);
+        kafkaTemplate.send(ApplicationConstant.TOPIC_STATE_MACHINE_STATUS, id, state);
 
     }
 
-    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_5,
+    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_STATE_MACHINE_STATUS,
             containerFactory = ApplicationConstant.KAFKA_LISTENER_CONTAINER_FACTORY)
-    public void receivedMessageFromTopic2(ConsumerRecord message) {
+    public void receivedMessageFromTopic5(ConsumerRecord message) {
         logger.info("Message Received form topic 5 " + message.value().toString());
         if(!("200").equals(message.value().toString())) {
             messageService.create(new Message("State machine", "create", "post"));
         }
     }
 
-    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_3,
+    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_STATE_MACHINE_SEARCH,
             containerFactory = ApplicationConstant.KAFKA_LISTENER_CONTAINER_FACTORY)
     public void receivedMessageFromTopic3(ConsumerRecord message) {
         Employee updateEmployee = (Employee) message.value();
@@ -77,7 +77,7 @@ public class KafkaConsumer {
             stateMachine.stop();
             stateMachineService.update(mongoDbRepositoryStateMachine.get().getId(), newState);
             updateEmployee.setState(newState);
-            kafkaTemplate.send(ApplicationConstant.TOPIC_4, message.key().toString(), updateEmployee);
+            kafkaTemplate.send(ApplicationConstant.TOPIC_UPDATE_EMPLOYEE, message.key().toString(), updateEmployee);
         } else {
             String resource = "state machine with id " + mongoDbRepositoryStateMachine.get().getId();
             messageService.create(new Message(resource, "try to find", "get"));
@@ -85,12 +85,12 @@ public class KafkaConsumer {
 
     }
 
-    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_4,
+    @KafkaListener(groupId = ApplicationConstant.GROUP_ID_STRING, topics = ApplicationConstant.TOPIC_UPDATE_EMPLOYEE,
             containerFactory = ApplicationConstant.KAFKA_LISTENER_CONTAINER_FACTORY)
     public void receivedMessageFromTopic4(ConsumerRecord message) {
-        Employee updateEmployee = (Employee) message.value();
-        employeeService.update(updateEmployee.getId(), updateEmployee);
-        logger.info("Employee was updated " + updateEmployee.getState());
+        Employee employee = (Employee) message.value();
+        Employee updatedEmployee = employeeService.update(employee.getId(), employee);
+        logger.info("Employee was updated " + updatedEmployee.getState());
 
     }
 }
